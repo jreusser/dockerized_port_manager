@@ -15,13 +15,20 @@ echo "==> Creating install directory: $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
 echo "==> Copying project files…"
-cp docker-compose.yml "$INSTALL_DIR/"
-# Copy .env only if it doesn't already exist (preserve customisations)
-if [[ ! -f "$INSTALL_DIR/.env" ]]; then
-  cp .env "$INSTALL_DIR/.env"
-  echo "    .env copied — edit $INSTALL_DIR/.env to set your passwords"
+# Sync everything except node_modules, __pycache__, and .venv
+rsync -a --delete \
+  --exclude='node_modules/' \
+  --exclude='__pycache__/' \
+  --exclude='*.pyc' \
+  --exclude='.venv/' \
+  --exclude='frontend/dist/' \
+  . "$INSTALL_DIR/"
+
+# Restore .env if it was overwritten with the template — preserve customisations
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+  echo "    project files synced (existing .env preserved)"
 else
-  echo "    .env already exists, skipping (keeping existing config)"
+  echo "    .env copied — edit $INSTALL_DIR/.env to set your passwords"
 fi
 
 echo "==> Installing systemd unit…"
@@ -38,7 +45,7 @@ systemctl start port-manager.service
 echo ""
 echo "Done! Port Manager is running."
 echo ""
-echo "  Dashboard:   http://localhost:$(grep FRONTEND_PORT $INSTALL_DIR/.env | cut -d= -f2 || echo 8080)"
+  echo "  Dashboard:   http://localhost:$(grep FRONTEND_PORT $INSTALL_DIR/.env | cut -d= -f2 || echo 8090)"
   echo "  API:         http://localhost:$(grep BACKEND_PORT $INSTALL_DIR/.env | cut -d= -f2 || echo 9000)/docs"
 echo ""
 echo "  Logs:        journalctl -u port-manager -f"

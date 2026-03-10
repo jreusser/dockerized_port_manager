@@ -7,8 +7,8 @@ A self-hosted service registry that tracks all the services running on your mach
 - **Service registration** — apps POST their name, port, and health path once on startup
 - **Periodic health polling** — each service is polled on its own configurable interval (5 s – 24 h)
 - **Status tracking** — `healthy` / `unhealthy` / `unreachable` / `unknown`, with consecutive failure counts and last-seen timestamps
-- **Web dashboard** — filterable, auto-refreshing grid of all registered services at `http://localhost:8080`
-- **REST API** — full CRUD at `http://localhost:9000/api/v1/services` with Swagger docs at `/docs`
+- **Web dashboard** — filterable, auto-refreshing grid of all registered services at `http://localhost:8091`
+- **REST API** — full CRUD at `http://localhost:9001/api/v1/services` with Swagger docs at `/docs`
 - **Persistent** — PostgreSQL backend, survives container and host restarts
 - **Journald logging** — status transitions are logged as structured output, captured by journald via Docker
 
@@ -72,18 +72,18 @@ systemctl start port-manager
 # Start everything (postgres + backend + frontend)
 docker compose up --build
 
-# Dashboard → http://localhost:8080
-# API docs  → http://localhost:9000/docs
+# Dashboard → http://localhost:8091
+# API docs  → http://localhost:9001/docs
 ```
 
 ---
 
 ## Registering a service
 
-POST to `http://localhost:9000/api/v1/services` from your application at startup.
+POST to `http://localhost:9001/api/v1/services` from your application at startup.
 
 ```bash
-curl -X POST http://localhost:9000/api/v1/services \
+curl -X POST http://localhost:9001/api/v1/services \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-api",
@@ -121,7 +121,7 @@ Registration is **idempotent** — re-posting an existing port re-activates it i
 | `PATCH` | `/api/v1/services/{id}` | Update name, path, interval, tags, active |
 | `DELETE` | `/api/v1/services/{id}` | Soft-deregister (stops polling) |
 
-Full interactive docs: `http://localhost:9000/docs`
+Full interactive docs: `http://localhost:9001/docs`
 
 ---
 
@@ -135,7 +135,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
-PORT_MANAGER_URL = os.getenv("PORT_MANAGER_URL", "http://localhost:9000/api/v1/services")
+PORT_MANAGER_URL = os.getenv("PORT_MANAGER_URL", "http://localhost:9001/api/v1/services")
 
 async def register_with_port_manager(name: str, port: int, **kwargs) -> None:
     try:
@@ -167,7 +167,7 @@ async def health():
 ```typescript
 import axios from "axios";
 
-const PORT_MANAGER_URL = process.env.PORT_MANAGER_URL ?? "http://localhost:9000/api/v1/services";
+const PORT_MANAGER_URL = process.env.PORT_MANAGER_URL ?? "http://localhost:9001/api/v1/services";
 
 async function registerWithPortManager(): Promise<void> {
   try {
@@ -196,7 +196,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      PORT_MANAGER_URL: "http://host.docker.internal:9000/api/v1/services"
+      PORT_MANAGER_URL: "http://host.docker.internal:9001/api/v1/services"
 ```
 
 ---
@@ -217,7 +217,7 @@ Avoid conflicts by sticking to these ranges:
 Check what's already registered before picking a port:
 
 ```bash
-curl -s http://localhost:9000/api/v1/services | jq '.[].port'
+curl -s http://localhost:9001/api/v1/services | jq '.[].port'
 ```
 
 ---
