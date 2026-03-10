@@ -1,0 +1,35 @@
+[Unit]
+Description=Port Manager — service registry with health-check polling
+Documentation=https://github.com/yourorg/dockerized_port_manager
+# Start after Docker and the network are ready
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+WorkingDirectory=/opt/port-manager
+
+# Pull latest images before starting (remove this line to skip)
+ExecStartPre=/usr/bin/docker compose pull --quiet
+
+# Start the stack; --wait blocks until all healthchecks pass
+ExecStart=/usr/bin/docker compose up --detach --remove-orphans --wait
+
+# Graceful shutdown: stop containers (30s timeout) then remove them
+ExecStop=/usr/bin/docker compose stop --timeout 30
+ExecStopPost=/usr/bin/docker compose down --remove-orphans
+
+# Restart the whole stack if it exits unexpectedly
+Restart=on-failure
+RestartSec=10s
+
+# Make stdout/stderr go to journald (visible via: journalctl -u port-manager)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=port-manager
+
+[Install]
+WantedBy=multi-user.target

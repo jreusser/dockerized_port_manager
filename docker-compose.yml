@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-portmgr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-portmgr}
+      POSTGRES_DB: ${POSTGRES_DB:-portmgr}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-portmgr} -d ${POSTGRES_DB:-portmgr}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - portmgr
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-portmgr}:${POSTGRES_PASSWORD:-portmgr}@db:5432/${POSTGRES_DB:-portmgr}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - portmgr
+      # Backend needs host network access to reach services on the host
+      # Use host.docker.internal or host-gateway alias for host-local services
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${BACKEND_PORT:-9000}:8000"
+    logging:
+      driver: journald
+      options:
+        tag: port-manager-backend
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - portmgr
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    logging:
+      driver: journald
+      options:
+        tag: port-manager-frontend
+
+volumes:
+  pgdata:
+
+networks:
+  portmgr:
