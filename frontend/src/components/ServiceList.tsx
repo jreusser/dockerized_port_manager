@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "primereact/button";
 import { ProgressBar } from "primereact/progressbar";
 import { InputText } from "primereact/inputtext";
 import { SelectButton } from "primereact/selectbutton";
@@ -7,6 +8,7 @@ import { Toast } from "primereact/toast";
 import { ServiceCard } from "./ServiceCard";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { deregisterService, fetchServices } from "../store/servicesSlice";
+import { api } from "../api/services";
 import type { HealthStatus } from "../types";
 
 const POLL_INTERVAL_MS = 10_000;
@@ -25,6 +27,30 @@ export const ServiceList: React.FC = () => {
   const toast = useRef<Toast>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [checkingAll, setCheckingAll] = useState(false);
+
+  const handleCheckAll = async () => {
+    setCheckingAll(true);
+    try {
+      const { checked } = await api.checkAllNow();
+      await dispatch(fetchServices());
+      toast.current?.show({
+        severity: "info",
+        summary: "Check complete",
+        detail: `Checked ${checked} service${checked !== 1 ? "s" : ""}`,
+        life: 3000,
+      });
+    } catch {
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail: "Health check failed",
+        life: 4000,
+      });
+    } finally {
+      setCheckingAll(false);
+    }
+  };
 
   const refresh = useCallback(() => {
     dispatch(fetchServices());
@@ -129,6 +155,15 @@ export const ServiceList: React.FC = () => {
           options={statusOptions}
           onChange={(e) => setStatusFilter(e.value ?? "all")}
           style={{ fontSize: "0.85rem" }}
+        />
+        <Button
+          icon={checkingAll ? "pi pi-spin pi-spinner" : "pi pi-bolt"}
+          label="Check all now"
+          size="small"
+          severity="secondary"
+          outlined
+          disabled={checkingAll}
+          onClick={handleCheckAll}
         />
       </div>
 

@@ -122,3 +122,43 @@ async def stop_all_pollers() -> None:
     for sid in ids:
         cancel_service(sid)
     logger.info("All health pollers stopped")
+
+
+async def check_all_now() -> int:
+    """Immediately check all active services concurrently. Returns number checked."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Service).where(Service.active == True))  # noqa: E712
+        services = result.scalars().all()
+
+    if not services:
+        return 0
+
+    async with httpx.AsyncClient() as client:
+        async def _check_and_save(service: Service) -> None:
+            new_status, _, error = await _check_once(service, client)
+            now = datetime.now(timezone.utc)
+            async with AsyncSessionLocal() as db:
+                svc = await db.get(Service, service.id)
+                if not svc:
+                    return
+                previous = svc.status
+                svc.status = new_status
+                svc.last_checked_at = now
+                if new_status == HealthStatus.HEALTHY:
+                    svc.last_healthy_at = now
+                    svc.consecutive_failures = 0
+                    if previous not in (HealthStatus.HEALTHY, HealthStatus.UNKNOWN):
+                        logger.info("SERVICE RECOVERED  name=%s port=%d", svc.name, svc.port)
+                else:
+                    svc.consecutive_failures += 1
+                    if previous == HealthStatus.HEALTHY or previous == HealthStatus.UNKNOWN:
+                        logger.warning(
+                            "SERVICE UNHEALTHY  name=%s port=%d  status=%s  error=%s",
+                            svc.name, svc.port, new_status.value, error,
+                        )
+                await db.commit()
+
+        await asyncio.gather(*[_check_and_save(s) for s in services])
+
+    logger.info("Manual check-all completed for %d service(s)", len(services))
+    return len(services)

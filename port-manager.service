@@ -10,7 +10,7 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 
-WorkingDirectory=/opt/port-manager
+WorkingDirectory=/home/reaper/coding/dockerized_port_manager
 
 # Pull latest images before starting (remove this line to skip)
 ExecStartPre=/usr/bin/docker compose pull --quiet

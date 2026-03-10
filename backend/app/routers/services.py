@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.health_checker import cancel_service, schedule_service
+from app.health_checker import cancel_service, check_all_now, schedule_service
 from app.models import Service
 from app.schemas import ServiceRegister, ServiceResponse, ServiceUpdate
 
@@ -63,6 +63,13 @@ async def register_service(
     await db.refresh(service)
     background_tasks.add_task(schedule_service, str(service.id))
     return _serialize(service)
+
+
+@router.post("/check-now", tags=["services"])
+async def check_all_services_now():
+    """Trigger an immediate health check on all active services."""
+    count = await check_all_now()
+    return {"checked": count}
 
 
 @router.get("", response_model=List[ServiceResponse])

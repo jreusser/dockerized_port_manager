@@ -17,4 +17,7 @@ export const api = {
 
   deregisterService: (id: string): Promise<void> =>
     axios.delete(`${BASE}/services/${id}`).then(() => undefined),
+
+  checkAllNow: (): Promise<{ checked: number }> =>
+    axios.post<{ checked: number }>(`${BASE}/services/check-now`).then((r) => r.data),
 };
